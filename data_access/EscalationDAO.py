@@ -9,7 +9,7 @@ class EscalationDAO():
 
     def get_escalation_data(self):
         escalations_df = pandas_gbq.read_gbq(
-            "select * from monzo_userresearch.escalations limit 100",
+            "select * from monzo_userresearch.escalations",
             project_id='analytics-take-home-test',
             credentials=self.credentials,
         )
