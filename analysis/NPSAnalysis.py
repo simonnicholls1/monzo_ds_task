@@ -7,7 +7,7 @@ from data_access.EscalationDAO import EscalationDAO
 from data_access.CSATDAO import CSATDAO
 from data_access.BigQueryConnection import BigQueryConnection
 import matplotlib.pyplot as plt
-from gensim.models import Word2Vec
+from gensim.models import Word2Vec, LdaModel
 from sklearn.naive_bayes import MultinomialNB
 from sklearn import metrics
 from sklearn.model_selection import train_test_split
@@ -24,6 +24,10 @@ from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import StratifiedShuffleSplit
 from calculations.TfidfEmbeddingVectoriser import TfidfEmbeddingVectoriser
 from nltk.probability import FreqDist
+import gensim.corpora as corpora
+from gensim.models import CoherenceModel
+from wordcloud import WordCloud
+import matplotlib.colors as mcolors
 
 
 #Setup connection and data classes
@@ -68,7 +72,7 @@ plt.show()
 
 rating_count=nps_df.groupby('Survey_Responses_Survey_Rating').count()
 plt.bar(rating_count.index.values, rating_count['Survey_Responses_Timestamp_Date'])
-plt.xlabel('Ratings').resample('W-Mon', on='Date').resample('W-Mon', on='Date').resample('W-Mon', on='Date')
+plt.xlabel('Ratings')
 plt.ylabel('Number of Reviews')
 plt.show()
 
@@ -79,6 +83,66 @@ plt.bar(avg_rating_per_day.index.values, avg_rating_per_day['Survey_Responses_Su
 plt.xlabel('Avg Rating')
 plt.ylabel('Date')
 plt.show()
+
+# Create Dictionary
+id2word = corpora.Dictionary(nps_comment_filtered)
+# Create Corpus
+texts = nps_comment_filtered
+# Term Document Frequency
+corpus = [id2word.doc2bow(text) for text in texts]
+
+lda_model = LdaModel(corpus=corpus,
+                       id2word=id2word,
+                       num_topics=20,
+                       random_state=100,
+                       update_every=1,
+                       chunksize=100,
+                       passes=10,
+                       alpha='auto',
+                       per_word_topics=True)
+
+# Print the Keyword in the 10 topics
+print(lda_model.print_topics())
+doc_lda = lda_model[corpus]
+
+# Compute Perplexity
+print('\nPerplexity: ', lda_model.log_perplexity(corpus))  # a measure of how good the model is. lower the better.
+
+# Compute Coherence Score
+coherence_model_lda = CoherenceModel(model=lda_model, texts=nps_comment_filtered, dictionary=id2word, coherence='c_v')
+coherence_lda = coherence_model_lda.get_coherence()
+print('\nCoherence Score: ', coherence_lda)
+
+cols = [color for name, color in mcolors.TABLEAU_COLORS.items()]  # more colors: 'mcolors.XKCD_COLORS'
+
+cloud = WordCloud(stopwords=stop_words,
+                  background_color='white',
+                  width=2500,
+                  height=1800,
+                  max_words=10,
+                  colormap='tab10',
+                  color_func=lambda *args, **kwargs: cols[i],
+                  prefer_horizontal=1.0)
+
+topics = lda_model.show_topics(formatted=False)
+
+fig, axes = plt.subplots(2, 2, figsize=(10,10), sharex=True, sharey=True)
+
+for i, ax in enumerate(axes.flatten()):
+    fig.add_subplot(ax)
+    topic_words = dict(topics[i][1])
+    cloud.generate_from_frequencies(topic_words, max_font_size=300)
+    plt.gca().imshow(cloud)
+    plt.gca().set_title('Topic ' + str(i), fontdict=dict(size=16))
+    plt.gca().axis('off')
+
+
+plt.subplots_adjust(wspace=0, hspace=0)
+plt.axis('off')
+plt.margins(x=0, y=0)
+plt.tight_layout()
+plt.show()
+
 
 ##Feature Extraction (Word2Vec)
 

@@ -7,7 +7,7 @@ class CSATDAO:
     def __init__(self, credentials):
         self.credentials = credentials
 
-    def get_all_csat_data(self):
+    def get_csat_data(self):
 
         csat_df = pandas_gbq.read_gbq(
             "select * from monzo_userresearch.csat",
