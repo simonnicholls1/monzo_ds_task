@@ -1,7 +1,6 @@
 from tabulate import tabulate
 from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.corpus import stopwords
-from nltk.stem import PorterStemmer
 from data_access.CSATDAO import CSATDAO
 from data_access.BigQueryConnection import BigQueryConnection
 import matplotlib.pyplot as plt
@@ -21,7 +20,9 @@ import gensim.corpora as corpora
 from gensim.models import CoherenceModel
 from wordcloud import WordCloud
 import matplotlib.colors as mcolors
-
+from analysis.TextPreProcess import TextPreProcess
+from collections import Counter
+import pandas as pd
 
 #Setup connection and data classes
 big_query = BigQueryConnection()
@@ -31,13 +32,14 @@ csat_dao = CSATDAO(credentials)
 
 #Basic text filtering setup
 stop_words=set(stopwords.words("english"))
-ps = PorterStemmer()
+
 
 ####################################### CSAT
 
 #Get data
 csat_df = csat_dao.get_csat_data()
 csat_df = csat_df.dropna()
+
 #csat_comment = csat_df.Conversations_Remark
 
 ################################Pre Process###################################################
@@ -46,21 +48,58 @@ csat_df['Number_Of_Words'] = csat_df.Conversations_Remark.str.split().apply(len)
 
 #Tokenise
 csat_comment_tokenised = csat_df.apply(lambda row: word_tokenize(row.Conversations_Remark), axis=1)
+#Get data per rating also
+csat_comment_tokenised_1 = csat_comment_tokenised.loc[csat_df.Conversations_Rating == 1]
+csat_comment_tokenised_2 = csat_comment_tokenised.loc[csat_df.Conversations_Rating == 2]
+csat_comment_tokenised_3 = csat_comment_tokenised.loc[csat_df.Conversations_Rating == 3]
+csat_comment_tokenised_4 = csat_comment_tokenised.loc[csat_df.Conversations_Rating == 4]
+csat_comment_tokenised_5 = csat_comment_tokenised.loc[csat_df.Conversations_Rating == 5]
 
-#Remove stop words, punctuation and stem word
-csat_comment_filtered=[]
-for s in csat_comment_tokenised:
-    comment = []
-    for w in s:
-        if w not in stop_words and w not in string.punctuation and len(w) > 3:
-            comment.append(ps.stem(w.lower()))
-    csat_comment_filtered.append(comment)
+#Filter
+text_filter = TextPreProcess()
+csat_comment_filtered = text_filter.filter_token_text(csat_comment_tokenised, stop_words)
+
+csat_comment_filtered_1 = text_filter.filter_token_text(csat_comment_tokenised_1, stop_words)
+csat_comment_filtered_2 = text_filter.filter_token_text(csat_comment_tokenised_2, stop_words)
+csat_comment_filtered_3 = text_filter.filter_token_text(csat_comment_tokenised_3, stop_words)
+csat_comment_filtered_4 = text_filter.filter_token_text(csat_comment_tokenised_4, stop_words)
+csat_comment_filtered_5 = text_filter.filter_token_text(csat_comment_tokenised_5, stop_words)
+
 
 ###########################Basic Distributions###############################################
-
+'''
 #Distribution of scores
-fdist = FreqDist([item for sublist in csat_comment_filtered for item in sublist])
-fdist.plot(30,cumulative=False)
+for i in [csat_comment_filtered, csat_comment_filtered_1, csat_comment_filtered_2, csat_comment_filtered_3, csat_comment_filtered_4, csat_comment_filtered_5]:
+    fdist = FreqDist([item for sublist in i for item in sublist])
+    fdist.plot(30,cumulative=False)
+    plt.show()
+'''
+##Create word cloud for each rating
+cols = [color for name, color in mcolors.TABLEAU_COLORS.items()]  # more colors: 'mcolors.XKCD_COLORS'
+cloud = WordCloud(stopwords=stop_words,
+                  background_color='white',
+                  width=2500,
+                  height=1800,
+                  max_words=10,
+                  colormap='tab10',
+                  color_func=lambda *args, **kwargs: cols[i],
+                  prefer_horizontal=1.0)
+
+rating_list = [csat_comment_filtered_1, csat_comment_filtered_2, csat_comment_filtered_3, csat_comment_filtered_4, csat_comment_filtered_5]
+fig, axes = plt.subplots(2, 2, figsize=(10,10), sharex=True, sharey=True)
+for i, ax in enumerate(axes.flatten()):
+    fig.add_subplot(ax)
+    words = dict(FreqDist([item for sublist in rating_list[i] for item in sublist]))
+    cloud.generate_from_frequencies(words, max_font_size=300)
+    plt.gca().imshow(cloud)
+    plt.gca().set_title('Rating ' + str(i+1), fontdict=dict(size=16))
+    plt.gca().axis('off')
+
+
+plt.subplots_adjust(wspace=0, hspace=0)
+plt.axis('off')
+plt.margins(x=0, y=0)
+plt.tight_layout()
 plt.show()
 
 #No of Reviews per date
@@ -69,6 +108,8 @@ plt.bar(rating_count.index.values, rating_count['Conversations_Conversation_Star
 plt.xlabel('Ratings')
 plt.ylabel('Number of Reviews')
 plt.show()
+
+
 
 #Rating per date
 csat_df['Date'] = csat_df.Conversations_Conversation_Start_Date
@@ -97,7 +138,7 @@ corpus = [id2word.doc2bow(text) for text in texts]
 #Create LDA model
 lda_model = LdaModel(corpus=corpus,
                        id2word=id2word,
-                       num_topics=20,
+                       num_topics=10,
                        random_state=100,
                        update_every=1,
                        chunksize=100,
@@ -130,7 +171,6 @@ cloud = WordCloud(stopwords=stop_words,
 topics = lda_model.show_topics(formatted=False)
 
 fig, axes = plt.subplots(2, 2, figsize=(10,10), sharex=True, sharey=True)
-
 for i, ax in enumerate(axes.flatten()):
     fig.add_subplot(ax)
     topic_words = dict(topics[i][1])
@@ -144,6 +184,33 @@ plt.subplots_adjust(wspace=0, hspace=0)
 plt.axis('off')
 plt.margins(x=0, y=0)
 plt.tight_layout()
+plt.show()
+
+data_flat =[w for w_list in csat_comment_filtered for w in w_list]
+counter = Counter(data_flat)
+out = []
+for i, topic in topics:
+    for word, weight in topic:
+        out.append([word, i , weight, counter[word]])
+
+df = pd.DataFrame(out, columns=['word', 'topic_id', 'importance', 'word_count'])
+
+# Plot Word Count and Weights of Topic Keywords
+fig, axes = plt.subplots(2, 5, figsize=(20,10), sharey=True, dpi=160)
+cols = [color for name, color in mcolors.TABLEAU_COLORS.items()]
+for i, ax in enumerate(axes.flatten()):
+    ax.bar(x='word', height="word_count", data=df.loc[df.topic_id==i, :], color=cols[i], width=0.5, alpha=0.3, label='Word Count')
+    ax_twin = ax.twinx()
+    ax_twin.bar(x='word', height="importance", data=df.loc[df.topic_id==i, :], color=cols[i], width=0.2, label='Weights')
+    ax.set_ylabel('Word Count', color=cols[i])
+    ax_twin.set_ylim(0, 0.030); ax.set_ylim(0, 3500)
+    ax.set_title('Topic: ' + str(i), color=cols[i], fontsize=16)
+    ax.tick_params(axis='y', left=False)
+    ax.set_xticklabels(df.loc[df.topic_id==i, 'word'], rotation=30, horizontalalignment= 'right')
+    ax.legend(loc='upper left'); ax_twin.legend(loc='upper right')
+
+fig.tight_layout(w_pad=2)
+fig.suptitle('Word Count and Importance of Topic Keywords', fontsize=22, y=1.05)
 plt.show()
 
 ###################################################Sentiment analysis#################################################
