@@ -23,6 +23,9 @@ import matplotlib.colors as mcolors
 from analysis.TextPreProcess import TextPreProcess
 from collections import Counter
 import pandas as pd
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+
+
 
 #Setup connection and data classes
 big_query = BigQueryConnection()
@@ -36,9 +39,17 @@ stop_words=set(stopwords.words("english"))
 
 ####################################### CSAT
 
+
+
 #Get data
 csat_df = csat_dao.get_csat_data()
 csat_df = csat_df.dropna()
+
+###########################Basic Sentiment###################################################
+#Do some basic sentiment analysis here using Vader, will train own model later
+
+nltk_sentiment = SentimentIntensityAnalyzer()
+csat_df['vader_sentiment'] = csat_df.Conversations_Remark.apply(nltk_sentiment.polarity_scores)
 
 #csat_comment = csat_df.Conversations_Remark
 
@@ -57,7 +68,7 @@ csat_comment_tokenised_5 = csat_comment_tokenised.loc[csat_df.Conversations_Rati
 
 #Filter
 text_filter = TextPreProcess()
-csat_comment_filtered = text_filter.filter_token_text(csat_comment_tokenised, stop_words)
+csat_comment_filtered = text_filter.filter_token_text(csat_comment_tokenised, stop_words, True)
 
 csat_comment_filtered_1 = text_filter.filter_token_text(csat_comment_tokenised_1, stop_words)
 csat_comment_filtered_2 = text_filter.filter_token_text(csat_comment_tokenised_2, stop_words)
@@ -80,13 +91,13 @@ cloud = WordCloud(stopwords=stop_words,
                   background_color='white',
                   width=2500,
                   height=1800,
-                  max_words=10,
+                  max_words=30,
                   colormap='tab10',
                   color_func=lambda *args, **kwargs: cols[i],
                   prefer_horizontal=1.0)
 
-rating_list = [csat_comment_filtered_1, csat_comment_filtered_2, csat_comment_filtered_3, csat_comment_filtered_4, csat_comment_filtered_5]
-fig, axes = plt.subplots(2, 2, figsize=(10,10), sharex=True, sharey=True)
+rating_list = [csat_comment_filtered, csat_comment_filtered_1, csat_comment_filtered_2, csat_comment_filtered_3, csat_comment_filtered_4, csat_comment_filtered_5]
+fig, axes = plt.subplots(3, 2, figsize=(10,10), sharex=True, sharey=True)
 for i, ax in enumerate(axes.flatten()):
     fig.add_subplot(ax)
     words = dict(FreqDist([item for sublist in rating_list[i] for item in sublist]))
