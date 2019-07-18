@@ -2,8 +2,8 @@ from tabulate import tabulate
 from nltk.tokenize import word_tokenize, sent_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
-#from data_access.EscalationDAO import EscalationDAO
-#from data_access.BigQueryConnection import BigQueryConnection
+from data_access.EscalationDAO import EscalationDAO
+from data_access.BigQueryConnection import BigQueryConnection
 import matplotlib.pyplot as plt
 from gensim.models import LdaModel
 import string
@@ -15,24 +15,26 @@ import matplotlib.colors as mcolors
 from nltk import ngrams
 import re
 import pandas as pd
+from analysis.TextPreProcess import TextPreProcess
 
 #Setup connection and data classes
-#big_query = BigQueryConnection()
-#credentials = big_query.get_credentials()
+big_query = BigQueryConnection()
+credentials = big_query.get_credentials()
 
-#escalation_dao = EscalationDAO(credentials)
+escalation_dao = EscalationDAO(credentials)
 
 
 #Basic text filtering setup
 stop_words=set(stopwords.words("english"))
 ps = PorterStemmer()
+text_filter = TextPreProcess()
 
 ####################################### Escalation
 
 #Get data
-#escalation_df = escalation_dao.get_escalation_data()
-#escalation_df = escalation_df.dropna()
-escalation_df = pd.read_pickle('escalation.pickle')
+escalation_df = escalation_dao.get_escalation_data()
+escalation_df = escalation_df.dropna()
+#escalation_df = pd.read_pickle('escalation.pickle')
 
 #escalation_comment = escalation_df.Survey_Responses_Survey_Comments
 
@@ -49,19 +51,8 @@ quad_grams = []
 five_grams=[]
 stop_words.add('customer')
 stop_words.add('monzo')
-for s in escalation_comment_tokenised:
-    comment = []
-    for w in s:
-        text = re.sub('[^0-9a-zA-Z]+', '', w)
-        text = text.lower()
-        if text not in stop_words and text not in string.punctuation and len(text) > 3:
-            text = ps.stem(text)
-            comment.append(text)
-    bi_grams.append(list(ngrams(comment, 2)))
-    tri_grams.append(list(ngrams(comment, 3)))
-    quad_grams.append(list(ngrams(comment, 4)))
-    five_grams.append(list(ngrams(comment, 5)))
-    escalation_comment_filtered.append(comment)
+
+[escalation_comment_filtered,bi_grams,tri_grams,quad_grams,five_grams, scores] = text_filter.filter_token_text(escalation_comment_tokenised, stop_words,None, False)
 
 would_like_words = [key[2] for key in [item for sublist in tri_grams for item in sublist] if key[0] == 'would' and key[1]=='like']
 would_like_abl_words = [key[3] for key in [item for sublist in quad_grams for item in sublist] if key[0] == 'would' and key[1]=='like' and key[2]=='abl']
@@ -69,7 +60,7 @@ would_like_abl_gram = [(key[3], key[4]) for key in [item for sublist in five_gra
 
 
 ################################Basic Distribution###################################################
-'''
+
 #plot single word frequency
 fdist = FreqDist([item for sublist in escalation_comment_filtered for item in sublist])
 fdist.plot(30,cumulative=False)
@@ -105,9 +96,6 @@ fdist_wlag = FreqDist(would_like_abl_gram)
 fdist_wlag.plot(30,cumulative=False)
 plt.show()
 plt.tight_layout()
-
-
-
 
 
 #Remove anything with less than frequency of 5 or top 5 listed words also
@@ -185,7 +173,7 @@ plt.tight_layout()
 plt.show()
 
 
-'''
+
 ###############################################Topic Modell1ing Bi Gram ##############################
 
 # Create Dictionary
