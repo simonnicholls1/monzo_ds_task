@@ -4,7 +4,7 @@ from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 from data_access.NPSDAO import NPSDAO
 from data_access.EscalationDAO import EscalationDAO
-from data_access.CSATDAO import CSATDAO
+from data_access.npsDAO import npsDAO
 from data_access.BigQueryConnection import BigQueryConnection
 import matplotlib.pyplot as plt
 from gensim.models import Word2Vec, LdaModel
@@ -25,13 +25,14 @@ from wordcloud import WordCloud
 import matplotlib.colors as mcolors
 import pandas as pd
 from collections import Counter
+from analysis.TextPreProcess import TextPreProcess
 
 
 #Setup connection and data classes
 big_query = BigQueryConnection()
 credentials = big_query.get_credentials()
 
-csat_dao = CSATDAO(credentials)
+nps_dao = npsDAO(credentials)
 escalation_dao = EscalationDAO(credentials)
 nps_dao = NPSDAO(credentials)
 
@@ -51,23 +52,17 @@ nps_df = nps_df.dropna()
 #Tokenise
 nps_comment_tokenised = nps_df.apply(lambda row: word_tokenize(row.Survey_Responses_Survey_Comments), axis=1)
 
-#Remove stop words, punctuation and stem word
-nps_comment_filtered=[]
-for s in nps_comment_tokenised:
-    comment = []
-    for w in s:
-        if w not in stop_words and w not in string.punctuation and len(w) > 3:
-            #comment.append(ps.stem(w.lower()))
-            comment.append(w.lower())
-    nps_comment_filtered.append(comment)
 
+#Filter
+text_filter = TextPreProcess()
+[nps_comment_filtered, bi_grams, tri_grams, four_grams, five_grams,score_return] = text_filter.filter_token_text(nps_comment_tokenised, stop_words,nps_df.Survey_Responses_Survey_Rating, False)
 
 ###########################Basic Distributions###############################################
 
 fdist = FreqDist([item for sublist in nps_comment_filtered for item in sublist])
 fdist.plot(30,cumulative=False)
 plt.show()
-'''
+'
 
 rating_count=nps_df.groupby('Survey_Responses_Survey_Rating').count()
 plt.bar(rating_count.index.values, rating_count['Survey_Responses_Timestamp_Date'])
@@ -82,7 +77,7 @@ plt.bar(avg_rating_per_day.index.values, avg_rating_per_day['Survey_Responses_Su
 plt.xlabel('Avg Rating')
 plt.ylabel('Date')
 plt.show()
-'''
+
 ###############################################Topic Modelling ######################################################
 
 # Create Dictionary

@@ -81,7 +81,7 @@ text_filter = TextPreProcess()
 
 
 ###########################Basic Distributions###############################################
-'''
+
 csat_df.groupby('Conversations_Rating').count().Conversations_Remark.plot.bar(x = 'Rating', y='Count')
 #Distribution of scores
 for i in [csat_comment_filtered, csat_comment_filtered_1, csat_comment_filtered_2, csat_comment_filtered_3, csat_comment_filtered_4, csat_comment_filtered_5]:
@@ -89,6 +89,7 @@ for i in [csat_comment_filtered, csat_comment_filtered_1, csat_comment_filtered_
     fdist.plot(30,cumulative=False)
     plt.tight_layout()
     plt.show()
+'''
 
 ##Create word cloud for each rating
 cols = [color for name, color in mcolors.TABLEAU_COLORS.items()]  # more colors: 'mcolors.XKCD_COLORS'

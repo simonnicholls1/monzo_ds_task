@@ -3,6 +3,8 @@ from nltk.tokenize import word_tokenize, sent_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 from data_access.EscalationDAO import EscalationDAO
+import gensim.corpora as corpora
+import matplotlib.colors as mcolors
 from data_access.BigQueryConnection import BigQueryConnection
 import matplotlib.pyplot as plt
 from gensim.models import LdaModel
@@ -51,6 +53,10 @@ quad_grams = []
 five_grams=[]
 stop_words.add('customer')
 stop_words.add('monzo')
+stop_words.add('would')
+stop_words.add('like')
+stop_words.add('able')
+stop_words.add('user')
 
 [escalation_comment_filtered,bi_grams,tri_grams,quad_grams,five_grams, scores] = text_filter.filter_token_text(escalation_comment_tokenised, stop_words,None, False)
 
@@ -66,7 +72,7 @@ fdist = FreqDist([item for sublist in escalation_comment_filtered for item in su
 fdist.plot(30,cumulative=False)
 plt.show()
 plt.tight_layout()
-
+'''
 #Plot bi grams
 fdist_bi = FreqDist([item for sublist in bi_grams for item in sublist])
 fdist_bi.plot(30,cumulative=False)
@@ -96,7 +102,7 @@ fdist_wlag = FreqDist(would_like_abl_gram)
 fdist_wlag.plot(30,cumulative=False)
 plt.show()
 plt.tight_layout()
-
+'''
 
 #Remove anything with less than frequency of 5 or top 5 listed words also
 escalation_comment_high_freq = []
@@ -117,7 +123,6 @@ id2word = corpora.Dictionary(escalation_comment_filtered)
 texts = escalation_comment_filtered
 # Term Document Frequency
 corpus = [id2word.doc2bow(text) for text in texts]
-corpus_bigram = [id2word.doc2bow(text) for text in bi_grams]
 
 #Create LDA model
 lda_model = LdaModel(corpus=corpus,
